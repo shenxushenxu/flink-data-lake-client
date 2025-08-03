@@ -1,6 +1,6 @@
-package com.shenxu.cn.source;
+package com.datalake.cn.source;
 
-import com.shenxu.cn.entity.DataLakeStreamData;
+import com.datalake.cn.entity.DataLakeStreamData;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.streaming.api.datastream.DataStream;

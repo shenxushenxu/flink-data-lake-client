@@ -1,7 +1,8 @@
-package com.shenxu.cn.sink;
+package com.datalake.cn.sink;
 
-import com.shenxu.cn.client.DataLakeClient;
-import com.shenxu.cn.entity.LineData;
+
+import com.datalake.cn.client.DataLakeClient;
+import com.datalake.cn.entity.LineData;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -11,8 +12,10 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class DataLakeSink extends AbstractStreamOperator<Void>
 implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.ProcessingTimeCallback{
@@ -23,50 +26,52 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     private int dataLakePort;
     private int countCondition;
     private long timeCondition;
-
+    private List<String> insertColumnName;
     private ListState<LineData> listState;
 
     private List<LineData> buffer;
 
     private ProcessingTimeService timerService;
 
-    private long sinkTime = 0;
 
-    public DataLakeSink(String tableName, String dataLakeIp, int dataLakePort, int count, long time) throws IOException {
+
+    public DataLakeSink(String tableName, String dataLakeIp, int dataLakePort,List<String> insertColumnName, int count, long time) throws IOException {
 
         this.tableName = tableName;
         this.dataLakeIp = dataLakeIp;
         this.dataLakePort = dataLakePort;
         this.countCondition = count;
         this.timeCondition = time;
+        this.insertColumnName = insertColumnName;
     }
 
 
     @Override
     public void open() throws Exception {
-        dataLakeClient = new DataLakeClient(dataLakeIp, dataLakePort);
+
+
+
+
+        dataLakeClient = new DataLakeClient(dataLakeIp, dataLakePort, tableName, insertColumnName);
         timerService = getProcessingTimeService();
         buffer = new ArrayList();
+
+
+        long currentTime = timerService.getCurrentProcessingTime();
+        long sinkTime = currentTime + timeCondition;
+        timerService.registerTimer(sinkTime, this);
+
+
     }
 
     @Override
     public void processElement(StreamRecord<LineData> element) throws Exception {
 
-        if (buffer.size() == 0 && sinkTime == 0){
-            long currentTime = timerService.getCurrentProcessingTime();
-            sinkTime = currentTime + timeCondition;
-
-            timerService.registerTimer(sinkTime, this);
-        }
-
-
         LineData lineData = element.getValue();
         buffer.add(lineData);
 
-
         if (buffer.size() >= countCondition){
             this.saveData();
-
         }
 
 
@@ -75,10 +80,15 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
 
     @Override
     public void onProcessingTime(long time) throws IOException, InterruptedException, Exception {
+
+        LocalDateTime currentDateTime = LocalDateTime.now();
+        System.out.println("定时器执行:  当前时间是：" + currentDateTime);
+
+
         this.saveData();
 
         long currentTime = timerService.getCurrentProcessingTime();
-        sinkTime = currentTime + time;
+        long sinkTime = currentTime + timeCondition;
         timerService.registerTimer(sinkTime, this);
     }
 
@@ -108,14 +118,16 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     }
 
     private void saveData() throws Exception {
-        LOG.info("插入了："+ buffer.size());
+        String uuid = UUID.randomUUID().toString();
+
+        LOG.info(uuid+"插入了："+ buffer.size());
         for (LineData lineData : buffer){
             dataLakeClient.putLineData(lineData);
         }
 
-        dataLakeClient.execute(tableName);
+        dataLakeClient.execute();
         buffer.clear();
-
+        LOG.info(uuid+"完成插入");
 
 
     }
