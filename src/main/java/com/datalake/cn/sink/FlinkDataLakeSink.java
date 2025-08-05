@@ -1,6 +1,6 @@
 package com.datalake.cn.sink;
 
-import com.datalake.cn.entity.LineData;
+import com.datalake.cn.entity.DataLakeLinkData;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
@@ -33,7 +33,7 @@ public class FlinkDataLakeSink implements Serializable {
     }
 
 
-    public void sink(DataStream<LineData> dataDataStream) throws Exception {
+    public void sink(DataStream<DataLakeLinkData> dataDataStream) throws Exception {
 
 
         dataDataStream.transform(tableName,

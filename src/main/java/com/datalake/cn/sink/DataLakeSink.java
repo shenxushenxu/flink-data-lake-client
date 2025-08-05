@@ -2,7 +2,7 @@ package com.datalake.cn.sink;
 
 
 import com.datalake.cn.client.DataLakeClient;
-import com.datalake.cn.entity.LineData;
+import com.datalake.cn.entity.DataLakeLinkData;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class DataLakeSink extends AbstractStreamOperator<Void>
-implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.ProcessingTimeCallback{
+implements OneInputStreamOperator<DataLakeLinkData, Void>, ProcessingTimeService.ProcessingTimeCallback{
 
     private DataLakeClient dataLakeClient = null;
     private String tableName;
@@ -27,9 +27,9 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     private int countCondition;
     private long timeCondition;
     private List<String> insertColumnName;
-    private ListState<LineData> listState;
+    private ListState<DataLakeLinkData> listState;
 
-    private List<LineData> buffer;
+    private List<DataLakeLinkData> buffer;
 
     private ProcessingTimeService timerService;
 
@@ -62,9 +62,9 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     }
 
     @Override
-    public void processElement(StreamRecord<LineData> element) throws Exception {
+    public void processElement(StreamRecord<DataLakeLinkData> element) throws Exception {
 
-        LineData lineData = element.getValue();
+        DataLakeLinkData lineData = element.getValue();
         buffer.add(lineData);
 
         if (buffer.size() >= countCondition){
@@ -87,14 +87,14 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        ListStateDescriptor<LineData> listDescriptor = new ListStateDescriptor<>("buffer-state",LineData.class);
+        ListStateDescriptor<DataLakeLinkData> listDescriptor = new ListStateDescriptor<>("buffer-state",DataLakeLinkData.class);
 
         // 获取或创建状态
         listState = context.getOperatorStateStore().getListState(listDescriptor);
         // 从状态恢复数据（故障恢复）
         if (context.isRestored()) {
             buffer = new ArrayList<>();
-            for (LineData element : listState.get()) {
+            for (DataLakeLinkData element : listState.get()) {
                 buffer.add(element);
             }
         }
@@ -104,7 +104,7 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         if (!buffer.isEmpty()){
-            for (LineData lineData : buffer){
+            for (DataLakeLinkData lineData : buffer){
                 listState.add(lineData);
             }
         }
@@ -112,7 +112,7 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
 
     private void saveData() throws Exception {
 
-        for (LineData lineData : buffer){
+        for (DataLakeLinkData lineData : buffer){
             dataLakeClient.putLineData(lineData);
         }
 
