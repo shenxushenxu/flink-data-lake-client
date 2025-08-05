@@ -49,9 +49,6 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     @Override
     public void open() throws Exception {
 
-
-
-
         dataLakeClient = new DataLakeClient(dataLakeIp, dataLakePort, tableName, insertColumnName);
         timerService = getProcessingTimeService();
         buffer = new ArrayList();
@@ -80,10 +77,6 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
 
     @Override
     public void onProcessingTime(long time) throws IOException, InterruptedException, Exception {
-
-        LocalDateTime currentDateTime = LocalDateTime.now();
-        System.out.println("定时器执行:  当前时间是：" + currentDateTime);
-
 
         this.saveData();
 
@@ -118,16 +111,13 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
     }
 
     private void saveData() throws Exception {
-        String uuid = UUID.randomUUID().toString();
 
-        LOG.info(uuid+"插入了："+ buffer.size());
         for (LineData lineData : buffer){
             dataLakeClient.putLineData(lineData);
         }
 
         dataLakeClient.execute();
         buffer.clear();
-        LOG.info(uuid+"完成插入");
 
 
     }
@@ -135,6 +125,6 @@ implements OneInputStreamOperator<LineData, Void>, ProcessingTimeService.Process
 
     @Override
     public void close() throws Exception {
-        dataLakeClient.close();
+//        dataLakeClient.close();
     }
 }
