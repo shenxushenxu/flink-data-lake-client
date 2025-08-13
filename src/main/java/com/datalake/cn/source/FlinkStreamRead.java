@@ -26,35 +26,38 @@ public class FlinkStreamRead extends RichSourceFunction<DataLakeStreamData> impl
     private int readCount;
     private ListState<String> listState;
     private Map<Integer, Long> offsetSave = null;
-
+    private Map<Integer, List<PartitionOffset>> map;
 
     //    private MapState<Integer, Long> offsetSave = null;
-    public FlinkStreamRead(String dataLakeIp, int dataLakePort, String tableName, int readCount) throws IOException {
+    public FlinkStreamRead(String dataLakeIp, int dataLakePort, String tableName, int readCount, Map<Integer, List<PartitionOffset>> map) throws IOException {
         this.dataLakeIp = dataLakeIp;
         this.dataLakePort = dataLakePort;
         this.tableName = tableName;
         this.readCount = readCount;
+        this.map = map;
     }
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        dataLakeStreamClient = new DataLakeStreamClient(dataLakeIp, dataLakePort);
-        dataLakeStreamClient.setReadCount(readCount);
-        dataLakeStreamClient.setTableName(tableName);
-
-        if (offsetSave != null) {
-            Set<Integer> keys = offsetSave.keySet();
-            for (Integer partitionCode : keys) {
-                Long offset = offsetSave.get(partitionCode);
-                dataLakeStreamClient.setPartitionCodeAndOffSet(partitionCode, offset);
+        int subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        if (map != null && offsetSave == null) {
+            offsetSave = new HashMap<>();
+            List<PartitionOffset> list = map.get(subTaskId);
+            for (PartitionOffset par : list) {
+                offsetSave.put(par.getPartitionCode(), par.getOffset());
             }
         }
-    }
 
-    public void setPartitionCodeAndOffSet(int partitionCode, long offset) {
-        dataLakeStreamClient.setPartitionCodeAndOffSet(partitionCode, offset);
-    }
 
+        dataLakeStreamClient = new DataLakeStreamClient(dataLakeIp, dataLakePort, tableName);
+        dataLakeStreamClient.setReadCount(readCount);
+        for (Integer partitionCode : offsetSave.keySet()) {
+            long offset = offsetSave.get(partitionCode);
+            dataLakeStreamClient.setPartitionCodeAndOffSet(partitionCode, offset);
+        }
+
+
+    }
 
     @Override
     public void run(SourceContext<DataLakeStreamData> ctx) throws Exception {
@@ -101,6 +104,8 @@ public class FlinkStreamRead extends RichSourceFunction<DataLakeStreamData> impl
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
+
+
         ListStateDescriptor<String> descriptor = new ListStateDescriptor<>("state", String.class);
         listState = context.getOperatorStateStore().getListState(descriptor);
 
